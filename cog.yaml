@@ -9,7 +9,8 @@ build:
   system_packages:
     - "gifsicle"
   
-  # No Python packages needed - gifsicle does all the heavy lifting!
+  python_packages:
+    - "pillow"
   
   # Run on CPU - gifsicle is extremely fast on CPU
   gpu: false
