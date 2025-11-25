@@ -1,0 +1,18 @@
+# Configuration for Cog ⚙️
+# Reference: https://cog.run/yaml
+
+build:
+  # Use Python 3.12 for best performance
+  python_version: "3.12"
+  
+  # System packages - gifsicle is the star of the show
+  system_packages:
+    - "gifsicle"
+  
+  # No Python packages needed - gifsicle does all the heavy lifting!
+  
+  # Run on CPU - gifsicle is extremely fast on CPU
+  gpu: false
+
+# Specify the prediction interface
+predict: "predict.py:Predictor"
