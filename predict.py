@@ -4,7 +4,7 @@ import tempfile
 import os
 import shutil
 from typing import Optional
-import json
+from PIL import Image
 
 
 class Predictor(BasePredictor):
@@ -75,12 +75,13 @@ class Predictor(BasePredictor):
         print(f"\n📊 Input file: {os.path.basename(gif)}")
         print(f"📦 Input size: {self._format_size(input_size)}")
         
-        # Get GIF info
+        # Get GIF info using Pillow
         gif_info = self._get_gif_info(gif)
         if gif_info:
             print(f"🎬 Frames: {gif_info['frames']}")
             print(f"📐 Dimensions: {gif_info['width']}x{gif_info['height']}")
-            print(f"🎨 Colors: {gif_info['colors']}")
+            if 'colors' in gif_info:
+                print(f"🎨 Colors: {gif_info['colors']}")
         
         # Create temp directory
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -97,7 +98,7 @@ class Predictor(BasePredictor):
             else:  # optimization_level == 3
                 cmd.append("-O3")
             
-            print(f"\n⚙️  Optimization level: {optimization_level}")
+            print(f"\n⚙️ Optimization level: {optimization_level}")
             
             # Unoptimize if requested
             if unoptimize:
@@ -171,7 +172,8 @@ class Predictor(BasePredictor):
             if output_info:
                 print(f"🎬 Output frames: {output_info['frames']}")
                 print(f"📐 Output dimensions: {output_info['width']}x{output_info['height']}")
-                print(f"🎨 Output colors: {output_info['colors']}")
+                if 'colors' in output_info:
+                    print(f"🎨 Output colors: {output_info['colors']}")
             
             print("\n✅ Success!")
             print("=" * 60 + "\n")
@@ -191,51 +193,28 @@ class Predictor(BasePredictor):
         return f"{size_bytes:.2f} TB"
     
     def _get_gif_info(self, gif_path: Path) -> Optional[dict]:
-        """Get information about the GIF file"""
+        """Get information about the GIF file using Pillow"""
         try:
-            result = subprocess.run(
-                ["gifsicle", "--info", str(gif_path)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            
-            # Parse the output
-            info = {}
-            lines = result.stdout.strip().split('\n')
-            
-            # First line usually has basic info
-            if lines:
-                first_line = lines[0]
-                # Try to extract dimensions
-                if 'x' in first_line:
-                    parts = first_line.split()
-                    for i, part in enumerate(parts):
-                        if 'x' in part and i > 0:
-                            dims = part.strip('[]()').split('x')
-                            if len(dims) == 2:
-                                try:
-                                    info['width'] = int(dims[0])
-                                    info['height'] = int(dims[1])
-                                except ValueError:
-                                    pass
-            
-            # Count frames
-            frame_count = result.stdout.count('+ image #')
-            info['frames'] = max(1, frame_count)
-            
-            # Try to find color info
-            for line in lines:
-                if 'colors' in line.lower():
-                    parts = line.split()
-                    for i, part in enumerate(parts):
-                        if 'color' in part.lower() and i > 0:
-                            try:
-                                info['colors'] = int(parts[i-1])
-                            except ValueError:
-                                pass
-            
-            return info if info else None
+            with Image.open(gif_path) as img:
+                info = {
+                    'width': img.size[0],
+                    'height': img.size[1],
+                    'frames': getattr(img, 'n_frames', 1),
+                    'format': img.format,
+                    'mode': img.mode
+                }
+                
+                # Try to get palette info (number of colors)
+                if hasattr(img, 'palette') and img.palette:
+                    try:
+                        palette = img.palette.getdata()
+                        if palette:
+                            # Calculate number of unique colors in palette
+                            info['colors'] = len(palette[1]) // 3  # RGB values
+                    except:
+                        pass
+                
+                return info
         except Exception as e:
-            print(f"Warning: Could not get GIF info: {e}")
+            print(f"Warning: Could not get GIF info with Pillow: {e}")
             return None
